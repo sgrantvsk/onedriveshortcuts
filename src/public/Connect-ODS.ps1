@@ -3,12 +3,12 @@ function Connect-ODS {
     param(
         [Parameter(Mandatory = $true, ParameterSetName = 'ClientSecret')]
         [Parameter(Mandatory = $true, ParameterSetName = 'ClientCertificate')]
-        [string] $TenantId,
-    
+        [guid] $TenantId,
+
         [Parameter(Mandatory = $true, ParameterSetName = 'ClientSecret')]
         [Parameter(Mandatory = $true, ParameterSetName = 'ClientCertificate')]
-        [string] $ClientId,
-    
+        [guid] $ClientId,
+
         [Parameter(Mandatory = $true, ParameterSetName = 'ClientSecret')]
         [securestring] $ClientSecret,
 
@@ -17,8 +17,8 @@ function Connect-ODS {
 
         [Parameter(Mandatory = $false, ParameterSetName = 'ClientSecret')]
         [Parameter(Mandatory = $false, ParameterSetName = 'ClientCertificate')]
-        [ValidateRange(0,4)]
-        [int] $AzureCloudInstance = 1
+        [ValidateSet('AzurePublic', 'AzureChina', 'AzureUsGovernment', 'AzureGermany')]
+        [string] $AzureCloudInstance = 'AzurePublic'
     )
 
     begin {
@@ -29,16 +29,36 @@ function Connect-ODS {
         switch ($PsCmdlet.ParameterSetName) {
             'ClientSecret' {
                 try {
-                    $Token = Get-MsalToken -ClientId $ClientId -TenantId $TenantId -ClientSecret $ClientSecret -AzureCloudInstance $AzureCloudInstance
+                    # PSMSALNet's -ClientSecret takes a plain string, not a SecureString,
+                    # so we decrypt it in memory just before the call.
+                    $PlainClientSecret = ConvertFrom-SecureString -SecureString $ClientSecret -AsPlainText
+
+                    $Token = Get-EntraToken `
+                        -ClientCredentialFlowWithSecret `
+                        -ClientId $ClientId `
+                        -TenantId $TenantId `
+                        -ClientSecret $PlainClientSecret `
+                        -AzureCloudInstance $AzureCloudInstance `
+                        -Resource GraphAPI
+
                     $PsCmdlet.SessionState.PSVariable.Set('_ODSToken', $Token)
                 } catch {
                     Write-Verbose $_
                     Write-Error "Token request using ClientSecret failed." -ErrorAction Stop
+                } finally {
+                    Remove-Variable -Name PlainClientSecret -ErrorAction SilentlyContinue
                 }
             }
             'ClientCertificate' {
                 try {
-                    $Token = Get-MsalToken -ClientId $ClientId -TenantId $TenantId -ClientCertificate $ClientCertificate -AzureCloudInstance $AzureCloudInstance
+                    $Token = Get-EntraToken `
+                        -ClientCredentialFlowWithCertificate `
+                        -ClientId $ClientId `
+                        -TenantId $TenantId `
+                        -ClientCertificate $ClientCertificate `
+                        -AzureCloudInstance $AzureCloudInstance `
+                        -Resource GraphAPI
+
                     $PsCmdlet.SessionState.PSVariable.Set('_ODSToken', $Token)
                 } catch {
                     Write-Verbose $_
