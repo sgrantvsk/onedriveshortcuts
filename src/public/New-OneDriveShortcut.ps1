@@ -80,7 +80,8 @@ function New-OneDriveShortcut {
         if ($FolderPath) {
             $ItemUniqueIdUri = "$($Uri)/$($DocumentLibraryName)/$($FolderPath)"
             $ItemUniqueIdUri = $ItemUniqueIdUri.replace(' ', '%20')
-            $ItemUniqueIdUri = $ItemUniqueIdUri.replace('%', '%25')
+            #$ItemUniqueIdUri = $ItemUniqueIdUri.replace('%', '%25')
+            write-Verbose "ItemUniqueIdUri: ${ItemUniqueIdUri}"
             $ItemUniqueIdRequest = @{
                 Resource = "sites/${SiteIdRaw}/lists/${DocumentLibraryId}/items?`$expand=fields&`$filter=contains(webUrl,'${ItemUniqueIdUri}')"
                 Method = [Microsoft.PowerShell.Commands.WebRequestMethod]::Get
